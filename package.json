@@ -41,10 +41,14 @@
     "loader.js": "^4.0.1"
   },
   "keywords": [
-    "ember-addon"
+    "ember-addon",
+    "ember-cli-deploy-plugin"
   ],
   "dependencies": {
-    "ember-cli-babel": "^5.1.6"
+    "consul": "0.25.0",
+    "ember-cli-babel": "^5.1.6",
+    "ember-cli-deploy-plugin": "0.2.6",
+    "rsvp": "^3.2.1"
   },
   "ember-addon": {
     "configPath": "tests/dummy/config"
