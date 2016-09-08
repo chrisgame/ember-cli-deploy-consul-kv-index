@@ -32,7 +32,7 @@ module.exports = {
         },
         activationSuffix: 'current',
         revisionKey: function(context) {
-          return '123';
+          return 'abc';
         },
         consulClient: function() {
           var host   = this.readConfig('host');
@@ -49,10 +49,10 @@ module.exports = {
       },
 
       upload: function() {
-        var allowOverwrite = this.readConfig('allowOverwrite');
-        var revisionKey    = this.readConfig('revisionKey');
-        var keyPrefix      = this.readConfig('keyPrefix');
-        var key            = keyPrefix + '/' + revisionKey;
+        var allowOverwrite     = this.readConfig('allowOverwrite');
+        var revisionIdentifier = this.readConfig('revisionKey');
+        var keyPrefix          = this.readConfig('keyPrefix');
+        var key                = keyPrefix + '/' + revisionIdentifier;
 
         var distDir     = this.readConfig('distDir');
         var filePattern = this.readConfig('filePattern');
@@ -60,7 +60,8 @@ module.exports = {
 
         return this._determineIfShouldUpload(key, allowOverwrite)
           .then(this._readFileContents.bind(this, filePath))
-          .then(this._upload.bind(this, key));
+          .then(this._upload.bind(this, key))
+          .then(this._updateRecentRevisions.bind(this, keyPrefix, revisionIdentifier));
       },
 
       _determineIfShouldUpload: function(key, shouldOverwrite) {
@@ -89,6 +90,30 @@ module.exports = {
         var consul = this.readConfig('consulClient');
 
         return consul.kv.set(key, data);
+      },
+
+      _updateRecentRevisions: function(keyPrefix, revisionIdentifier) {
+        var consul = this.readConfig('consulClient');
+        let key    = keyPrefix + '/recent-revisions';
+
+        return consul.kv.get(key)
+          .then(function(result) {
+            if (!result) {
+              return consul.kv.set(key, revisionIdentifier);
+            } else {
+              let identifiers = result['Value'].split(',');
+
+              if (identifiers.indexOf(revisionIdentifier) === -1) {
+                identifiers.unshift(revisionIdentifier);
+
+                return consul.kv.set(key, identifiers.join(','));
+              }
+            }
+
+            return Promise.resolve();
+          }, function() {
+            return Promise.reject('Error occurred updating recent revisions');
+          });
       }
     });
 
