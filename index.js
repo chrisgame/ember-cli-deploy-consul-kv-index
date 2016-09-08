@@ -7,6 +7,8 @@ var denodeify = require('rsvp').denodeify;
 var readFile  = denodeify(fs.readFile);
 var Consul    = require('consul');
 
+var Promise   = require('ember-cli/lib/ext/promise');
+
 var BasePlugin = require('ember-cli-deploy-plugin');
 
 module.exports = {
@@ -21,6 +23,7 @@ module.exports = {
         host: 'localhost',
         port: 8500,
         filePattern: 'index.html',
+        allowOverwrite: false,
         distDir: function(context) {
           return context.distDir || 'tmp/deploy-dist';
         },
@@ -29,43 +32,64 @@ module.exports = {
         },
         activationSuffix: 'current',
         revisionKey: function(context) {
-          return context.commandOptions.revision || (context.revisionData && context.revisionData.revisionKey);
+          return '123';
+        },
+        consulClient: function() {
+          var host   = this.readConfig('host');
+          var port   = this.readConfig('port');
+          var secure = this.readConfig('secure');
+
+          return Consul({
+            host: host,
+            port: port,
+            secure: secure,
+            promisify: true
+          });
         }
       },
 
       upload: function() {
-        var host   = this.readConfig('host');
-        var port   = this.readConfig('port');
-        var secure = this.readConfig('secure');
-
-        var consul = Consul({
-          host: host,
-          port: port,
-          secure: secure,
-          promisify: true
-        });
-
-        var revisionKey = this.readConfig('revisionKey');
-        var keyPrefix   = this.readConfig('keyPrefix');
-        var key         = keyPrefix + '/' + revisionKey;
+        var allowOverwrite = this.readConfig('allowOverwrite');
+        var revisionKey    = this.readConfig('revisionKey');
+        var keyPrefix      = this.readConfig('keyPrefix');
+        var key            = keyPrefix + '/' + revisionKey;
 
         var distDir     = this.readConfig('distDir');
         var filePattern = this.readConfig('filePattern');
         var filePath    = path.join(distDir, filePattern);
 
-        return this._readFileContents(filePath)
-          .then(function(data) {
-            return consul.kv.set(key, data);
+        return this._determineIfShouldUpload(key, allowOverwrite)
+          .then(this._readFileContents.bind(this, filePath))
+          .then(this._upload.bind(this, key));
+      },
+
+      _determineIfShouldUpload: function(key, shouldOverwrite) {
+        var consul = this.readConfig('consulClient');
+
+        return consul.kv.keys(key)
+          .then(function(result) {
+            if (result.indexOf(key) === -1 || shouldOverwrite) {
+              return Promise.resolve();
+            }
+
+            return Promise.reject('Revision already exists');
+          }, function() {
+            return Promise.resolve(); // revision doesn't already exist
           });
       },
 
       _readFileContents: function(path) {
         return readFile(path)
           .then(function(buffer) {
-            return buffer.toString();
+            return Promise.resolve(buffer.toString());
           });
-      }
+      },
 
+      _upload: function(key, data) {
+        var consul = this.readConfig('consulClient');
+
+        return consul.kv.set(key, data);
+      }
     });
 
     return new Plugin();
