@@ -27,13 +27,17 @@ module.exports = {
         distDir: function(context) {
           return context.distDir || 'tmp/deploy-dist';
         },
+        namespace: function(context) {
+          return context.project.name();
+        },
         keyPrefix: function(context){
-          return context.project.name() + '/revisions';
+          return this.readConfig('namespace') + '/revisions';
         },
         activationSuffix: 'current',
         revisionKey: function(context) {
-          return 'abc';
+          return '666';
         },
+        maxEntries: 5,
         consulClient: function() {
           var host   = this.readConfig('host');
           var port   = this.readConfig('port');
@@ -50,7 +54,9 @@ module.exports = {
 
       upload: function() {
         var allowOverwrite     = this.readConfig('allowOverwrite');
+        var maxEntries         = this.readConfig('maxEntries');
         var revisionIdentifier = this.readConfig('revisionKey');
+        var namespace          = this.readConfig('namespace');
         var keyPrefix          = this.readConfig('keyPrefix');
         var key                = keyPrefix + '/' + revisionIdentifier;
 
@@ -61,7 +67,8 @@ module.exports = {
         return this._determineIfShouldUpload(key, allowOverwrite)
           .then(this._readFileContents.bind(this, filePath))
           .then(this._upload.bind(this, key))
-          .then(this._updateRecentRevisions.bind(this, keyPrefix, revisionIdentifier));
+          .then(this._updateRecentRevisions.bind(this, namespace, revisionIdentifier))
+          .then(this._trimRecentRevisions.bind(this, namespace, maxEntries));
       },
 
       _determineIfShouldUpload: function(key, shouldOverwrite) {
@@ -92,9 +99,9 @@ module.exports = {
         return consul.kv.set(key, data);
       },
 
-      _updateRecentRevisions: function(keyPrefix, revisionIdentifier) {
+      _updateRecentRevisions: function(namespace, revisionIdentifier) {
         var consul = this.readConfig('consulClient');
-        let key    = keyPrefix + '/recent-revisions';
+        let key    = namespace + '/recent-revisions';
 
         return consul.kv.get(key)
           .then(function(result) {
@@ -113,6 +120,29 @@ module.exports = {
             return Promise.resolve();
           }, function() {
             return Promise.reject('Error occurred updating recent revisions');
+          });
+      },
+
+      _trimRecentRevisions: function(namespace, maxEntries) {
+        var consul = this.readConfig('consulClient');
+        let key    = namespace + '/recent-revisions';
+
+        return consul.kv.get(key)
+          .then(function(result) {
+            let identifiers = result['Value'].split(',');
+            let remaining = identifiers.splice(0, maxEntries);
+
+            return consul.kv.set(key, remaining.join(','))
+              .then(function() {
+                if (identifiers.length > 0) {
+                  return Promise.all(identifiers.map(function(idenfitier) {
+                    let key = namespace + '/revisions/' + idenfitier;
+                    return consul.kv.del({ key: key, recurse: true });
+                  }, []));
+                } else {
+                  return Promise.resolve();
+                }
+              });
           });
       }
     });
