@@ -22,8 +22,8 @@ module.exports = {
         host: 'localhost',
         port: 8500,
         filePattern: 'index.html',
-        allowOverwrite: false,
-        maxEntries: 5,
+        allowOverwrite: true,
+        maxRevisions: 5,
         distDir: function(context) {
           return context.distDir || 'tmp/deploy-dist';
         },
@@ -61,7 +61,7 @@ module.exports = {
 
       upload: function() {
         var allowOverwrite = this.readConfig('allowOverwrite');
-        var maxEntries     = this.readConfig('maxEntries');
+        var maxRevisions   = this.readConfig('maxRevisions');
         var namespace      = this.readConfig('namespace');
         var revisionKey    = this.readConfig('revisionKey');
         var metadata       = this.readConfig('metadata');
@@ -77,7 +77,7 @@ module.exports = {
           .then(this._upload.bind(this, namespace, revisionKey))
           .then(this._uploadMetadata.bind(this, namespace, revisionKey, metadata))
           .then(this._updateRecentRevisions.bind(this, namespace, revisionKey))
-          .then(this._trimRecentRevisions.bind(this, namespace, maxEntries))
+          .then(this._trimRecentRevisions.bind(this, namespace, maxRevisions))
           .then(this._uploadSuccess.bind(this, namespace, revisionKey));
       },
 
@@ -99,6 +99,10 @@ module.exports = {
 
         return consul.keys(key)
           .then(function(result) {
+            if (!result) {
+              return Promise.resolve();
+            }
+
             if (result.indexOf(key) === -1 || shouldOverwrite) {
               return Promise.resolve();
             }
@@ -113,6 +117,8 @@ module.exports = {
         return readFile(path)
           .then(function(buffer) {
             return Promise.resolve(buffer.toString());
+          }, function() {
+            return Promise.reject('No file found at `' + path + '`');
           });
       },
 
@@ -154,14 +160,18 @@ module.exports = {
           });
       },
 
-      _trimRecentRevisions: function(namespace, maxEntries) {
+      _trimRecentRevisions: function(namespace, maxRevisions) {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/recent-revisions';
 
         return consul.get(key)
           .then(function(result) {
+            if (!result) {
+              return Promise.resolve();
+            }
+
             var revisionKeys = result['Value'].split(',');
-            var remaining = revisionKeys.splice(0, maxEntries);
+            var remaining = revisionKeys.splice(0, maxRevisions);
 
             if (revisionKeys.length) {
               return consul.set(key, remaining.join(','))
