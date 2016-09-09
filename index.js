@@ -24,6 +24,7 @@ module.exports = {
         port: 8500,
         filePattern: 'index.html',
         allowOverwrite: false,
+        maxEntries: 5,
         distDir: function(context) {
           return context.distDir || 'tmp/deploy-dist';
         },
@@ -36,7 +37,9 @@ module.exports = {
         revisionKeyToActivate: function(context) {
           return context.commandOptions.revision;
         },
-        maxEntries: 5,
+        metadata: function(context) {
+          return context.revisionData || {};
+        },
         consulClient: function(context) {
           return context.consulClient;
         }
@@ -62,6 +65,7 @@ module.exports = {
         var maxEntries     = this.readConfig('maxEntries');
         var namespace      = this.readConfig('namespace');
         var revisionKey    = this.readConfig('revisionKey');
+        var metadata       = this.readConfig('metadata');
 
         var distDir     = this.readConfig('distDir');
         var filePattern = this.readConfig('filePattern');
@@ -72,6 +76,7 @@ module.exports = {
         return this._determineIfShouldUpload(namespace, revisionKey, allowOverwrite)
           .then(this._readFileContents.bind(this, filePath))
           .then(this._upload.bind(this, namespace, revisionKey))
+          .then(this._uploadMetadata.bind(this, namespace, revisionKey, metadata))
           .then(this._updateRecentRevisions.bind(this, namespace, revisionKey))
           .then(this._trimRecentRevisions.bind(this, namespace, maxEntries))
           .then(this._uploadSuccess.bind(this, namespace, revisionKey));
@@ -117,6 +122,13 @@ module.exports = {
         var key    = namespace + '/revisions/' + revisionKey;
 
         return consul.kv.set(key, data);
+      },
+
+      _uploadMetadata: function(namespace, revisionKey, metadata) {
+        var consul = this.readConfig('consulClient');
+        var key    = namespace + '/revisions/' + revisionKey + '/metadata';
+
+        return consul.kv.set(key, JSON.stringify(metadata));
       },
 
       _updateRecentRevisions: function(namespace, revisionKey) {
