@@ -35,7 +35,7 @@ module.exports = {
         },
         activationSuffix: 'current',
         revisionKey: function(context) {
-          return '666';
+          return context.commandOptions.revision || '666';
         },
         maxEntries: 5,
         consulClient: function() {
@@ -64,12 +64,28 @@ module.exports = {
         var filePattern = this.readConfig('filePattern');
         var filePath    = path.join(distDir, filePattern);
 
+        this.log('Uploading `' + filePath + '`', { verbose: true });
+
         return this._determineIfShouldUpload(key, allowOverwrite)
           .then(this._readFileContents.bind(this, filePath))
           .then(this._upload.bind(this, key))
           .then(this._updateRecentRevisions.bind(this, namespace, revisionIdentifier))
           .then(this._trimRecentRevisions.bind(this, namespace, maxEntries))
-          .then(this._successMessage.bind(this, key));
+          .then(this._uploadSuccess.bind(this, key));
+      },
+
+      activate: function() {
+        var namespace          = this.readConfig('namespace');
+        var revisionIdentifier = this.readConfig('revisionKey');
+        var keyPrefix          = this.readConfig('keyPrefix');
+        var key                = keyPrefix + '/' + revisionIdentifier;
+
+        this.log('Activating revision `' + key + '`', { verbose: true });
+
+        return this._retrieveRecentRevisions(namespace)
+          .then(this._validateRevisionKey.bind(this, revisionIdentifier))
+          .then(this._activateRevision.bind(this, namespace, revisionIdentifier))
+          .then(this._activationSuccess.bind(this, revisionIdentifier));
       },
 
       _determineIfShouldUpload: function(key, shouldOverwrite) {
@@ -151,8 +167,49 @@ module.exports = {
           });
       },
 
-      _successMessage: function(key) {
+      _uploadSuccess: function(key) {
         this.log('Uploaded with key `' + key + '`', { verbose: true });
+        return Promise.resolve();
+      },
+
+      _retrieveRecentRevisions: function(namespace) {
+        var consul = this.readConfig('consulClient');
+        var key = namespace + '/recent-revisions';
+
+        return consul.kv.get(key)
+          .then(function(result) {
+            if (result) {
+              let identifiers = result['Value'].split(',');
+
+              if (identifiers.length) {
+                return identifiers;
+              } else {
+                return Promise.reject('No recent revisions found');
+              }
+            } else {
+              return Promise.reject('No recent revisions found');
+            }
+          });
+      },
+
+      _validateRevisionKey: function(revisionKey, recentRevisions) {
+        if (recentRevisions.indexOf(revisionKey) > -1) {
+          return Promise.resolve();
+        } else {
+          return Promise.reject('Unknown revision key');
+        }
+      },
+
+      _activateRevision: function(namespace, revisionKey) {
+        var consul = this.readConfig('consulClient');
+        var key    = namespace + '/active-revision';
+
+        return consul.kv.set(key, revisionKey);
+      },
+
+      _activationSuccess: function(revisionKey) {
+        this.log('✔ Activated revision `' + revisionKey + '`', { verbose: true });
+
         return Promise.resolve();
       }
     });
