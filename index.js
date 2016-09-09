@@ -1,11 +1,10 @@
 /* jshint node: true */
-'use strict';
 
 var fs        = require('fs');
 var path      = require('path');
 var denodeify = require('rsvp').denodeify;
 var readFile  = denodeify(fs.readFile);
-var Consul    = require('consul');
+var consul    = require('consul');
 
 var Promise   = require('ember-cli/lib/ext/promise');
 
@@ -41,7 +40,7 @@ module.exports = {
           return context.revisionData || {};
         },
         consulClient: function(context) {
-          return context.consulClient;
+          return context.consulClient.kv;
         }
       },
 
@@ -50,14 +49,14 @@ module.exports = {
         var port   = this.readConfig('port');
         var secure = this.readConfig('secure');
 
-        var consul = Consul({
+        var client = consul({
           host: host,
           port: port,
           secure: secure,
           promisify: true
         });
 
-        return { consulClient: consul };
+        return { consulClient: client };
       },
 
       upload: function() {
@@ -98,7 +97,7 @@ module.exports = {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/revisions/' + revisionKey;
 
-        return consul.kv.keys(key)
+        return consul.keys(key)
           .then(function(result) {
             if (result.indexOf(key) === -1 || shouldOverwrite) {
               return Promise.resolve();
@@ -121,31 +120,31 @@ module.exports = {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/revisions/' + revisionKey;
 
-        return consul.kv.set(key, data);
+        return consul.set(key, data);
       },
 
       _uploadMetadata: function(namespace, revisionKey, metadata) {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/revisions/' + revisionKey + '/metadata';
 
-        return consul.kv.set(key, JSON.stringify(metadata));
+        return consul.set(key, JSON.stringify(metadata));
       },
 
       _updateRecentRevisions: function(namespace, revisionKey) {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/recent-revisions';
 
-        return consul.kv.get(key)
+        return consul.get(key)
           .then(function(result) {
             if (!result) {
-              return consul.kv.set(key, revisionKey);
+              return consul.set(key, revisionKey);
             } else {
               var revisionKeys = result['Value'].split(',');
 
               if (revisionKeys.indexOf(revisionKey) === -1) {
                 revisionKeys.unshift(revisionKey);
 
-                return consul.kv.set(key, revisionKeys.join(','));
+                return consul.set(key, revisionKeys.join(','));
               }
             }
 
@@ -159,18 +158,18 @@ module.exports = {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/recent-revisions';
 
-        return consul.kv.get(key)
+        return consul.get(key)
           .then(function(result) {
             var revisionKeys = result['Value'].split(',');
             var remaining = revisionKeys.splice(0, maxEntries);
 
             if (revisionKeys.length) {
-              return consul.kv.set(key, remaining.join(','))
+              return consul.set(key, remaining.join(','))
                 .then(function() {
                   if (revisionKeys.length > 0) {
                     return Promise.all(revisionKeys.map(function(revisionKey) {
                       var key = namespace + '/revisions/' + revisionKey;
-                      return consul.kv.del({ key: key, recurse: true });
+                      return consul.del({ key: key, recurse: true });
                     }, []));
                   } else {
                     return Promise.resolve();
@@ -191,7 +190,7 @@ module.exports = {
         var consul = this.readConfig('consulClient');
         var key = namespace + '/recent-revisions';
 
-        return consul.kv.get(key)
+        return consul.get(key)
           .then(function(result) {
             if (result) {
               var revisionKeys = result['Value'].split(',');
@@ -219,7 +218,7 @@ module.exports = {
         var consul = this.readConfig('consulClient');
         var key    = namespace + '/active-revision';
 
-        return consul.kv.set(key, revisionKey);
+        return consul.set(key, revisionKey);
       },
 
       _activationSuccess: function(namespace, revisionKey) {
