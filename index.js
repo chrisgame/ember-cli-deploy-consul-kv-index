@@ -31,24 +31,30 @@ module.exports = {
           return context.project.name();
         },
         revisionKey: function(context) {
-          return context.revisionData.revisionKey;
+          return (context.revisionData && context.revisionData.revisionKey) || 'missing-revision-key';
         },
         revisionKeyToActivate: function(context) {
           return context.commandOptions.revision;
         },
         maxEntries: 5,
-        consulClient: function() {
-          var host   = this.readConfig('host');
-          var port   = this.readConfig('port');
-          var secure = this.readConfig('secure');
-
-          return Consul({
-            host: host,
-            port: port,
-            secure: secure,
-            promisify: true
-          });
+        consulClient: function(context) {
+          return context.consulClient;
         }
+      },
+
+      setup: function() {
+        var host   = this.readConfig('host');
+        var port   = this.readConfig('port');
+        var secure = this.readConfig('secure');
+
+        var consul = Consul({
+          host: host,
+          port: port,
+          secure: secure,
+          promisify: true
+        });
+
+        return { consulClient: consul };
       },
 
       upload: function() {
@@ -75,7 +81,7 @@ module.exports = {
         var namespace   = this.readConfig('namespace');
         var revisionKey = this.readConfig('revisionKeyToActivate');
 
-        this.log('Activating revision `' + revisonKey + '` in namespace `' + namespace + '`', { verbose: true });
+        this.log('Activating revision `' + revisionKey + '` in namespace `' + namespace + '`', { verbose: true });
 
         return this._retrieveRecentRevisions(namespace)
           .then(this._validateRevisionKey.bind(this, revisionKey))
