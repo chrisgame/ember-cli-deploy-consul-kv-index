@@ -30,12 +30,11 @@ module.exports = {
         namespace: function(context) {
           return context.project.name();
         },
-        keyPrefix: function(context){
-          return this.readConfig('namespace') + '/revisions';
-        },
-        activationSuffix: 'current',
         revisionKey: function(context) {
-          return context.commandOptions.revision || '666';
+          return context.revisionData.revisionKey;
+        },
+        revisionKeyToActivate: function(context) {
+          return context.commandOptions.revision;
         },
         maxEntries: 5,
         consulClient: function() {
@@ -53,12 +52,10 @@ module.exports = {
       },
 
       upload: function() {
-        var allowOverwrite     = this.readConfig('allowOverwrite');
-        var maxEntries         = this.readConfig('maxEntries');
-        var revisionIdentifier = this.readConfig('revisionKey');
-        var namespace          = this.readConfig('namespace');
-        var keyPrefix          = this.readConfig('keyPrefix');
-        var key                = keyPrefix + '/' + revisionIdentifier;
+        var allowOverwrite = this.readConfig('allowOverwrite');
+        var maxEntries     = this.readConfig('maxEntries');
+        var namespace      = this.readConfig('namespace');
+        var revisionKey    = this.readConfig('revisionKey');
 
         var distDir     = this.readConfig('distDir');
         var filePattern = this.readConfig('filePattern');
@@ -66,30 +63,29 @@ module.exports = {
 
         this.log('Uploading `' + filePath + '`', { verbose: true });
 
-        return this._determineIfShouldUpload(key, allowOverwrite)
+        return this._determineIfShouldUpload(namespace, revisionKey, allowOverwrite)
           .then(this._readFileContents.bind(this, filePath))
-          .then(this._upload.bind(this, key))
-          .then(this._updateRecentRevisions.bind(this, namespace, revisionIdentifier))
+          .then(this._upload.bind(this, namespace, revisionKey))
+          .then(this._updateRecentRevisions.bind(this, namespace, revisionKey))
           .then(this._trimRecentRevisions.bind(this, namespace, maxEntries))
-          .then(this._uploadSuccess.bind(this, key));
+          .then(this._uploadSuccess.bind(this, namespace, revisionKey));
       },
 
       activate: function() {
-        var namespace          = this.readConfig('namespace');
-        var revisionIdentifier = this.readConfig('revisionKey');
-        var keyPrefix          = this.readConfig('keyPrefix');
-        var key                = keyPrefix + '/' + revisionIdentifier;
+        var namespace   = this.readConfig('namespace');
+        var revisionKey = this.readConfig('revisionKeyToActivate');
 
-        this.log('Activating revision `' + key + '`', { verbose: true });
+        this.log('Activating revision `' + revisonKey + '` in namespace `' + namespace + '`', { verbose: true });
 
         return this._retrieveRecentRevisions(namespace)
-          .then(this._validateRevisionKey.bind(this, revisionIdentifier))
-          .then(this._activateRevision.bind(this, namespace, revisionIdentifier))
-          .then(this._activationSuccess.bind(this, revisionIdentifier));
+          .then(this._validateRevisionKey.bind(this, revisionKey))
+          .then(this._activateRevision.bind(this, namespace, revisionKey))
+          .then(this._activationSuccess.bind(this, namespace, revisionKey));
       },
 
-      _determineIfShouldUpload: function(key, shouldOverwrite) {
+      _determineIfShouldUpload: function(namespace, revisionKey, shouldOverwrite) {
         var consul = this.readConfig('consulClient');
+        var key    = namespace + '/revisions/' + revisionKey;
 
         return consul.kv.keys(key)
           .then(function(result) {
@@ -110,27 +106,28 @@ module.exports = {
           });
       },
 
-      _upload: function(key, data) {
+      _upload: function(namespace, revisionKey, data) {
         var consul = this.readConfig('consulClient');
+        var key    = namespace + '/revisions/' + revisionKey;
 
         return consul.kv.set(key, data);
       },
 
-      _updateRecentRevisions: function(namespace, revisionIdentifier) {
+      _updateRecentRevisions: function(namespace, revisionKey) {
         var consul = this.readConfig('consulClient');
-        let key    = namespace + '/recent-revisions';
+        var key    = namespace + '/recent-revisions';
 
         return consul.kv.get(key)
           .then(function(result) {
             if (!result) {
-              return consul.kv.set(key, revisionIdentifier);
+              return consul.kv.set(key, revisionKey);
             } else {
-              let identifiers = result['Value'].split(',');
+              var revisionKeys = result['Value'].split(',');
 
-              if (identifiers.indexOf(revisionIdentifier) === -1) {
-                identifiers.unshift(revisionIdentifier);
+              if (revisionKeys.indexOf(revisionKey) === -1) {
+                revisionKeys.unshift(revisionKey);
 
-                return consul.kv.set(key, identifiers.join(','));
+                return consul.kv.set(key, revisionKeys.join(','));
               }
             }
 
@@ -142,19 +139,19 @@ module.exports = {
 
       _trimRecentRevisions: function(namespace, maxEntries) {
         var consul = this.readConfig('consulClient');
-        let key    = namespace + '/recent-revisions';
+        var key    = namespace + '/recent-revisions';
 
         return consul.kv.get(key)
           .then(function(result) {
-            let identifiers = result['Value'].split(',');
-            let remaining = identifiers.splice(0, maxEntries);
+            var revisionKeys = result['Value'].split(',');
+            var remaining = revisionKeys.splice(0, maxEntries);
 
-            if (identifiers.length) {
+            if (revisionKeys.length) {
               return consul.kv.set(key, remaining.join(','))
                 .then(function() {
-                  if (identifiers.length > 0) {
-                    return Promise.all(identifiers.map(function(idenfitier) {
-                      let key = namespace + '/revisions/' + idenfitier;
+                  if (revisionKeys.length > 0) {
+                    return Promise.all(revisionKeys.map(function(revisionKey) {
+                      var key = namespace + '/revisions/' + revisionKey;
                       return consul.kv.del({ key: key, recurse: true });
                     }, []));
                   } else {
@@ -167,8 +164,8 @@ module.exports = {
           });
       },
 
-      _uploadSuccess: function(key) {
-        this.log('Uploaded with key `' + key + '`', { verbose: true });
+      _uploadSuccess: function(namespace, revisionKey) {
+        this.log('Uploaded with key `' + revisionKey + '` into namespace `' + namespace + '`', { verbose: true });
         return Promise.resolve();
       },
 
@@ -179,10 +176,10 @@ module.exports = {
         return consul.kv.get(key)
           .then(function(result) {
             if (result) {
-              let identifiers = result['Value'].split(',');
+              var revisionKeys = result['Value'].split(',');
 
-              if (identifiers.length) {
-                return identifiers;
+              if (revisionKeys.length) {
+                return revisionKeys;
               } else {
                 return Promise.reject('No recent revisions found');
               }
@@ -207,8 +204,8 @@ module.exports = {
         return consul.kv.set(key, revisionKey);
       },
 
-      _activationSuccess: function(revisionKey) {
-        this.log('✔ Activated revision `' + revisionKey + '`', { verbose: true });
+      _activationSuccess: function(namespace, revisionKey) {
+        this.log('✔ Activated revision `' + revisionKey + '` in namespace `' + namespace + '`', { verbose: true });
 
         return Promise.resolve();
       }
