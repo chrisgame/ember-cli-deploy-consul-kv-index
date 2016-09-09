@@ -28,13 +28,13 @@ module.exports = {
           return context.distDir || 'tmp/deploy-dist';
         },
         namespace: function(context) {
-          return context.project.name();
+          return (context.project && context.project.name()) || 'missing-namespace';
         },
         revisionKey: function(context) {
           return (context.revisionData && context.revisionData.revisionKey) || 'missing-revision-key';
         },
         revisionKeyToActivate: function(context) {
-          return context.commandOptions.revision;
+          return (context.commandOptions && context.commandOptions.revision);
         },
         metadata: function(context) {
           return context.revisionData || {};
@@ -207,6 +207,10 @@ module.exports = {
       },
 
       _validateRevisionKey: function(revisionKey, recentRevisions) {
+        if (!revisionKey) {
+          return Promise.reject('Revision key to activate must be provided');
+        }
+
         if (recentRevisions.indexOf(revisionKey) > -1) {
           return Promise.resolve();
         } else {
