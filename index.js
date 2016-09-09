@@ -68,7 +68,8 @@ module.exports = {
           .then(this._readFileContents.bind(this, filePath))
           .then(this._upload.bind(this, key))
           .then(this._updateRecentRevisions.bind(this, namespace, revisionIdentifier))
-          .then(this._trimRecentRevisions.bind(this, namespace, maxEntries));
+          .then(this._trimRecentRevisions.bind(this, namespace, maxEntries))
+          .then(this._successMessage.bind(this, key));
       },
 
       _determineIfShouldUpload: function(key, shouldOverwrite) {
@@ -132,18 +133,27 @@ module.exports = {
             let identifiers = result['Value'].split(',');
             let remaining = identifiers.splice(0, maxEntries);
 
-            return consul.kv.set(key, remaining.join(','))
-              .then(function() {
-                if (identifiers.length > 0) {
-                  return Promise.all(identifiers.map(function(idenfitier) {
-                    let key = namespace + '/revisions/' + idenfitier;
-                    return consul.kv.del({ key: key, recurse: true });
-                  }, []));
-                } else {
-                  return Promise.resolve();
-                }
-              });
+            if (identifiers.length) {
+              return consul.kv.set(key, remaining.join(','))
+                .then(function() {
+                  if (identifiers.length > 0) {
+                    return Promise.all(identifiers.map(function(idenfitier) {
+                      let key = namespace + '/revisions/' + idenfitier;
+                      return consul.kv.del({ key: key, recurse: true });
+                    }, []));
+                  } else {
+                    return Promise.resolve();
+                  }
+                });
+            } else {
+              return Promise.resolve();
+            }
           });
+      },
+
+      _successMessage: function(key) {
+        this.log('Uploaded with key `' + key + '`', { verbose: true });
+        return Promise.resolve();
       }
     });
 
