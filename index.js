@@ -35,6 +35,10 @@ module.exports = {
         recentRevisionsToken: 'recent-revisions',
         activeRevisionToken: 'active-revision',
         revisionKeyToActivate: function(context) {
+          if (context.commandOptions && context.commandOptions.activate) {
+            return this.readConfig('revisionKey');
+          }
+
           return (context.commandOptions && context.commandOptions.revision);
         },
         metadata: function(context) {
