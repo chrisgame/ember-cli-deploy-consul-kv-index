@@ -128,7 +128,23 @@ default this option will use the `revision` argument passed in from the command
 line, accessible by the `commandOptions.revision` property from the deployment
 context.
 
-*Default:* `context.commandOptions.revision'`
+*Default:* `this.readConfig('revisionKey')` if `--activate` passed to command. Otherwise `context.commandOptions.revision`
+
+### aliases
+
+A list of aliases that you'd like this revision to be linked to. This allows
+lightning servers to look up revisions based on other alises. You might want to
+do this if you'd like to refer to a revision by a git branch or ticket number
+which would be a rolling alias to a specific revision at any one point in time.
+Setting this property will make the following keys available:
+
+- `<namespace>/revisions/<revision-key>/aliases #=> 'foo,bar'`
+- `<namespace>/aliases/foo #=> '<revision-key>'`
+- `<namespace>/aliases/bar #=> '<revision-key>'`
+
+This way you can look up a list of aliases for a revision key, and also look up a revision key for an alias.
+
+*Default:* `[this.readConfig('revisionKey')]`
 
 ### recentRevisionsToken
 
