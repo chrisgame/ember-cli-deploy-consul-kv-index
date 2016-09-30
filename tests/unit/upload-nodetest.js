@@ -253,12 +253,24 @@ describe('Consul KV Index | upload hook', function() {
         };
 
         consulClient.store['foo/recent-revisions'] = 'aaa,bbb,ccc';
+
+        consulClient.store['foo/aliases/aaa'] = 'aaa';
+        consulClient.store['foo/aliases/xxx'] = 'aaa';
         consulClient.store['foo/revisions/aaa'] = '111';
         consulClient.store['foo/revisions/aaa/metadata'] = '{"foo": 111}';
+        consulClient.store['foo/revisions/aaa/aliases'] = 'aaa,xxx';
+
+        consulClient.store['foo/aliases/bbb'] = 'bbb';
+        consulClient.store['foo/aliases/yyy'] = 'bbb';
         consulClient.store['foo/revisions/bbb'] = '222';
         consulClient.store['foo/revisions/bbb/metadata'] = '{"foo": 222}';
+        consulClient.store['foo/revisions/bbb/aliases'] = 'bbb,yyy';
+
+        consulClient.store['foo/aliases/ccc'] = 'ccc';
+        consulClient.store['foo/aliases/zzz'] = 'ccc';
         consulClient.store['foo/revisions/ccc'] = '333';
         consulClient.store['foo/revisions/ccc/metadata'] = '{"foo": 333}';
+        consulClient.store['foo/revisions/ccc/aliases'] = 'ccc,zzz';
 
         instance.beforeHook(context);
         instance.configure(context);
@@ -270,6 +282,9 @@ describe('Consul KV Index | upload hook', function() {
             assert.equal(consulClient.store[key], '1234,aaa,bbb');
             assert.isUndefined(consulClient.store['foo/revisions/ccc']);
             assert.isUndefined(consulClient.store['foo/revisions/ccc/metadata']);
+            assert.isUndefined(consulClient.store['foo/revisions/ccc/aliases']);
+            assert.isUndefined(consulClient.store['foo/aliases/ccc']);
+            assert.isUndefined(consulClient.store['foo/aliases/zzz']);
           });
       });
 
