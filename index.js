@@ -44,6 +44,11 @@ module.exports = {
         metadata: function(context) {
           return context.revisionData || {};
         },
+        aliases: function() {
+          var revisionKey = this.readConfig('revisionKey');
+
+          return [revisionKey];
+        },
         allowOverwrite: true,
         maxRevisions: 10
       },
@@ -80,6 +85,7 @@ module.exports = {
         var allowOverwrite = this.readConfig('allowOverwrite');
         var maxRevisions   = this.readConfig('maxRevisions');
         var revisionKey    = this.readConfig('revisionKey');
+        var aliases        = this.readConfig('aliases');
         var metadata       = this.readConfig('metadata');
 
         var distDir     = this.readConfig('distDir');
@@ -94,6 +100,7 @@ module.exports = {
           .then(this._readFileContents.bind(this, filePath))
           .then(this._uploadRevision.bind(this, consul, revisionKey))
           .then(this._uploadMetadata.bind(this, consul, revisionKey, metadata))
+          .then(this._updateAliases.bind(this, consul, revisionKey, aliases))
           .then(this._updateRecentRevisions.bind(this, consul, revisionKey))
           .then(this._trimRecentRevisions.bind(this, consul, maxRevisions))
           .then(this._uploadSuccess.bind(this, revisionKey));
@@ -159,6 +166,12 @@ module.exports = {
 
       _uploadRevision: function(consul, revisionKey, data) {
         return consul.setRevision(revisionKey, data);
+      },
+
+      _updateAliases: function(consul, revisionKey, aliases) {
+        return aliases.reduce(function(promise, alias) {
+          return promise.then(consul.updateAlias.bind(consul, revisionKey, alias));
+        }, Promise.resolve());
       },
 
       _uploadMetadata: function(consul, revisionKey, metadata) {
