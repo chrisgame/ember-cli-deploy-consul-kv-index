@@ -35,10 +35,19 @@ module.exports = {
         recentRevisionsToken: 'recent-revisions',
         activeRevisionToken: 'active-revision',
         revisionKeyToActivate: function(context) {
+          if (context.commandOptions && context.commandOptions.activate) {
+            return this.readConfig('revisionKey');
+          }
+
           return (context.commandOptions && context.commandOptions.revision);
         },
         metadata: function(context) {
           return context.revisionData || {};
+        },
+        aliases: function() {
+          var revisionKey = this.readConfig('revisionKey');
+
+          return [revisionKey];
         },
         allowOverwrite: true,
         maxRevisions: 10
@@ -76,6 +85,7 @@ module.exports = {
         var allowOverwrite = this.readConfig('allowOverwrite');
         var maxRevisions   = this.readConfig('maxRevisions');
         var revisionKey    = this.readConfig('revisionKey');
+        var aliases        = this.readConfig('aliases');
         var metadata       = this.readConfig('metadata');
 
         var distDir     = this.readConfig('distDir');
@@ -90,6 +100,7 @@ module.exports = {
           .then(this._readFileContents.bind(this, filePath))
           .then(this._uploadRevision.bind(this, consul, revisionKey))
           .then(this._uploadMetadata.bind(this, consul, revisionKey, metadata))
+          .then(this._updateAliases.bind(this, consul, revisionKey, aliases))
           .then(this._updateRecentRevisions.bind(this, consul, revisionKey))
           .then(this._trimRecentRevisions.bind(this, consul, maxRevisions))
           .then(this._uploadSuccess.bind(this, revisionKey));
@@ -157,6 +168,12 @@ module.exports = {
         return consul.setRevision(revisionKey, data);
       },
 
+      _updateAliases: function(consul, revisionKey, aliases) {
+        return aliases.reduce(function(promise, alias) {
+          return promise.then(consul.updateAlias.bind(consul, revisionKey, alias));
+        }, Promise.resolve());
+      },
+
       _uploadMetadata: function(consul, revisionKey, metadata) {
         return consul.setRevisionMetadata(revisionKey, metadata);
       },
@@ -166,28 +183,52 @@ module.exports = {
           .then(function(revisionKeys) {
             if (revisionKeys.indexOf(revisionKey) === -1) {
               revisionKeys.unshift(revisionKey);
-
             }
 
-            return consul.setRecentRevisions(revisionKeys.join(','));
+            return consul.setRecentRevisions(revisionKeys);
           });
       },
 
       _trimRecentRevisions: function(consul, maxRevisions) {
+        var self = this;
+
         return consul.recentRevisionKeys()
           .then(function(revisionKeys) {
             if (!revisionKeys.length || revisionKeys.length <= maxRevisions) {
               return Promise.resolve();
             }
 
-            var remaining = revisionKeys.splice(0, maxRevisions);
+            return consul.getActiveRevision()
+              .then(self._determineKeysToRemove.bind(self, maxRevisions, revisionKeys))
+              .then(self._cleanUpKeys.bind(self, consul));
+          });
+      },
 
-            return consul.setRecentRevisions(remaining.join(','))
-              .then(function() {
-                  return Promise.all(revisionKeys.map(function(revisionKey) {
-                    return consul.deleteRevision(revisionKey);
-                  }, []));
-              });
+      _determineKeysToRemove: function(maxRevisions, revisionKeys, activeRevision) {
+        var numberToRemove = revisionKeys.length - maxRevisions;
+
+        var obj = revisionKeys.reverse().reduce(function(obj, key) {
+          if ((obj.toRemove.length === numberToRemove) || key === activeRevision) {
+            obj.toKeep.push(key);
+          } else {
+            obj.toRemove.push(key);
+          }
+
+          return obj;
+        }, { toRemove: [], toKeep: [] });
+
+        return Promise.resolve(obj);
+      },
+
+      _cleanUpKeys: function(consul, obj) {
+        var toKeep   = obj.toKeep.reverse();
+        var toRemove = obj.toRemove;
+
+        return consul.setRecentRevisions(toKeep)
+          .then(function() {
+              return Promise.all(toRemove.map(function(revisionKey) {
+                return consul.deleteRevision(revisionKey);
+              }, []));
           });
       },
 

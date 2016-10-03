@@ -28,6 +28,7 @@ var consulClient = {
   del: function(options) {
     delete this.store[options.key];
     delete this.store[options.key + '/metadata'];
+    delete this.store[options.key + '/aliases'];
     return Promise.resolve();
   }
 };
