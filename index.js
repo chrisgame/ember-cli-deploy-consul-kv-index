@@ -78,7 +78,7 @@ module.exports = {
 
         var consul = new Consul(client, namespaceToken, recentRevisionsToken, activeRevisionToken);
 
-        context._consul = consul;
+        context[this.name] = { _consul: consul };
       },
 
       upload: function(context) {
@@ -92,7 +92,7 @@ module.exports = {
         var filePattern = this.readConfig('filePattern');
         var filePath    = path.join(distDir, filePattern);
 
-        var consul = context._consul;
+        var consul = context[this.name]._consul;
 
         this.log('Uploading `' + filePath + '`', { verbose: true });
 
@@ -110,7 +110,7 @@ module.exports = {
         var namespace   = this.readConfig('namespaceToken');
         var revisionKey = this.readConfig('revisionKeyToActivate');
 
-        var consul = context._consul;
+        var consul = context[this.name]._consul;
 
         this.log('Activating revision `' + revisionKey + '` in namespace `' + namespace + '`', { verbose: true });
 
@@ -121,7 +121,7 @@ module.exports = {
       },
 
       fetchRevisions: function(context) {
-        var consul = context._consul;
+        var consul = context[this.name]._consul;
 
         return Promise.hash({
             revisions: consul.recentRevisionKeys(),
