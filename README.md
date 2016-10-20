@@ -306,6 +306,8 @@ object:
 
 - `npm test`
 
+<p align="center"><sub>Made with :heart: by The Kayako Engineering Team</sub></p>
+
 [1]: https://github.com/lukemelia/ember-cli-deploy-lightning-pack
 "ember-cli-deploy-lightning-pack"
 [2]: http://ember-cli-deploy.com/plugins "Plugin Documentation"
