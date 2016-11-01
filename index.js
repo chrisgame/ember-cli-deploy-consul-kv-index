@@ -22,6 +22,7 @@ module.exports = {
         host: 'localhost',
         port: 8500,
         secure: true,
+        token: null,
         filePattern: 'index.html',
         distDir: function(context) {
           return context.distDir || 'tmp/deploy-dist';
@@ -61,12 +62,19 @@ module.exports = {
         var host    = this.readConfig('host');
         var port    = this.readConfig('port');
         var secure  = this.readConfig('secure');
+        var token   = this.readConfig('token');
+
         var options = {
           host: host,
           port: port,
           secure: secure,
-          promisify: true
+          promisify: true,
+          defaults: {}
         };
+
+        if (token) {
+          options.defaults.token = token;
+        }
 
         var client;
 
