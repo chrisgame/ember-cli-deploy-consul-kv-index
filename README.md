@@ -85,6 +85,12 @@ Whether or not to enable HTTPS.
 
 *Default:* `true`
 
+### token
+
+An ACL token to be included with each request to Consul.
+
+*Default:* `null`
+
 ### filePattern
 
 A file matching this pattern will be uploaded to Consul.
