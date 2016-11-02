@@ -349,7 +349,7 @@ describe('Consul KV Index | upload hook', function() {
         revisionKey: '1234',
         distDir: process.cwd() + '/tests/fixtures/dist',
         filePattern: 'foo.txt',
-        aliases: ['1234', 'my-branch']
+        aliases: ['my-branch']
       };
 
       var context = {
@@ -366,7 +366,7 @@ describe('Consul KV Index | upload hook', function() {
 
       return assert.isFulfilled(instance.upload(context))
         .then(function() {
-          assert.equal(consulClient.store['foo/revisions/1234/aliases'], '1234,my-branch');
+          assert.equal(consulClient.store['foo/revisions/1234/aliases'], 'my-branch,1234');
           assert.equal(consulClient.store['foo/aliases/1234'], '1234');
           assert.equal(consulClient.store['foo/aliases/my-branch'], '1234');
         });
@@ -382,7 +382,7 @@ describe('Consul KV Index | upload hook', function() {
         revisionKey: '9999',
         distDir: process.cwd() + '/tests/fixtures/dist',
         filePattern: 'foo.txt',
-        aliases: ['9999', 'my-branch']
+        aliases: ['my-branch']
       };
 
       var context = {
@@ -406,7 +406,7 @@ describe('Consul KV Index | upload hook', function() {
           assert.equal(consulClient.store['foo/revisions/1234/aliases'], '1234');
           assert.equal(consulClient.store['foo/aliases/1234'], '1234');
 
-          assert.equal(consulClient.store['foo/revisions/9999/aliases'], '9999,my-branch');
+          assert.equal(consulClient.store['foo/revisions/9999/aliases'], 'my-branch,9999');
           assert.equal(consulClient.store['foo/aliases/9999'], '9999');
           assert.equal(consulClient.store['foo/aliases/my-branch'], '9999');
         });

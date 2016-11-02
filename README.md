@@ -150,7 +150,7 @@ Setting this property will make the following keys available:
 
 This way you can look up a list of aliases for a revision key, and also look up a revision key for an alias.
 
-*Default:* `[this.readConfig('revisionKey')]`
+*Default:* `[]`
 
 ### recentRevisionsToken
 
