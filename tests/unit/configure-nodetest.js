@@ -24,7 +24,14 @@ describe('Consul KV Index | configure hook', function() {
       });
 
       var config = {
-        port: 1234
+        host: 'foo',
+        port: 1234,
+        secure: false,
+        token: 'bar',
+        filePattern: 'baz',
+        recentRevisionsToken: 'bill',
+        activeRevisionToken: 'bob',
+        aliases: ['a', 'b']
       };
 
       var context = {
@@ -36,7 +43,15 @@ describe('Consul KV Index | configure hook', function() {
 
       instance.beforeHook(context);
       instance.configure(context);
+
+      assert.equal(instance.readConfig('host'), 'foo');
       assert.equal(instance.readConfig('port'), 1234);
+      assert.isFalse(instance.readConfig('secure'));
+      assert.equal(instance.readConfig('token'), 'bar');
+      assert.equal(instance.readConfig('filePattern'), 'baz');
+      assert.equal(instance.readConfig('recentRevisionsToken'), 'bill');
+      assert.equal(instance.readConfig('activeRevisionToken'), 'bob');
+      assert.deepEqual(instance.readConfig('aliases'), ['a', 'b']);
     });
 
     it('uses the default config if user provided config is missing', function() {
@@ -53,7 +68,15 @@ describe('Consul KV Index | configure hook', function() {
 
       instance.beforeHook(context);
       instance.configure(context);
+
+      assert.equal(instance.readConfig('host'), 'localhost');
       assert.equal(instance.readConfig('port'), 8500);
+      assert.isTrue(instance.readConfig('secure'));
+      assert.isNull(instance.readConfig('token'));
+      assert.equal(instance.readConfig('filePattern'), 'index.html');
+      assert.equal(instance.readConfig('recentRevisionsToken'), 'recent-revisions');
+      assert.equal(instance.readConfig('activeRevisionToken'), 'active-revision');
+      assert.deepEqual(instance.readConfig('aliases'), []);
     });
 
     describe('distDir', function() {
@@ -93,7 +116,7 @@ describe('Consul KV Index | configure hook', function() {
       });
     });
 
-    describe('namespace', function() {
+    describe('namespaceToken', function() {
       it('reads from the context if it exists', function() {
         var instance = subject.createDeployPlugin({
           name: 'consul-kv-index'

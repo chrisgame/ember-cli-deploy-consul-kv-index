@@ -45,11 +45,7 @@ module.exports = {
         metadata: function(context) {
           return context.revisionData || {};
         },
-        aliases: function() {
-          var revisionKey = this.readConfig('revisionKey');
-
-          return [revisionKey];
-        },
+        aliases: [],
         allowOverwrite: true,
         maxRevisions: 10
       },
@@ -177,6 +173,10 @@ module.exports = {
       },
 
       _updateAliases: function(consul, revisionKey, aliases) {
+        if (aliases.indexOf(revisionKey) === -1) {
+          aliases.push(revisionKey);
+        }
+
         return aliases.reduce(function(promise, alias) {
           return promise.then(consul.updateAlias.bind(consul, revisionKey, alias));
         }, Promise.resolve());
