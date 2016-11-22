@@ -35,9 +35,9 @@ module.exports = {
         },
         recentRevisionsToken: 'recent-revisions',
         activeRevisionToken: 'active-revision',
-        revisionKeyToActivate: function(context) {
+        revisionKeyToActivate: function(context, pluginHelper) {
           if (context.commandOptions && context.commandOptions.activate) {
-            return this.readConfig('revisionKey');
+            return pluginHelper.readConfig('revisionKey');
           }
 
           return (context.commandOptions && context.commandOptions.revision);
