@@ -27,7 +27,7 @@ To get up and running quickly, do the following:
 - Install this plugin
 
 ```bash
-$ ember install ember-cli-deploy-consul-kv
+$ ember install ember-cli-deploy-consul-kv-index
 ```
 
 - Place the following configuration into `config/deploy.js`
