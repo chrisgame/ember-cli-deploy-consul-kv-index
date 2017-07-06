@@ -7,7 +7,7 @@ var readFile  = denodeify(fs.readFile);
 var consulLib = require('consul');
 var Consul    = require('./lib/consul');
 
-var Promise   = require('ember-cli/lib/ext/promise');
+var RSVP      = require('rsvp');
 
 var BasePlugin = require('ember-cli-deploy-plugin');
 
@@ -127,7 +127,7 @@ module.exports = {
       fetchRevisions: function(context) {
         var consul = context[this.name]._consul;
 
-        return Promise.hash({
+        return RSVP.hash({
             revisions: consul.recentRevisionKeys(),
             activeRevision: consul.getActiveRevision()
           })
@@ -150,21 +150,21 @@ module.exports = {
         return consul.keysForRevision(revisionKey)
           .then(function(keys) {
             if (!keys || keys.length === 0 || shouldOverwrite) {
-              return Promise.resolve();
+              return RSVP.resolve();
             }
 
-            return Promise.reject('Revision already exists');
+            return RSVP.reject('Revision already exists');
           }, function() {
-            return Promise.resolve();
+            return RSVP.resolve();
           });
       },
 
       _readFileContents: function(path) {
         return readFile(path)
           .then(function(buffer) {
-            return Promise.resolve(buffer.toString());
+            return RSVP.resolve(buffer.toString());
           }, function() {
-            return Promise.reject('No file found at `' + path + '`');
+            return RSVP.reject('No file found at `' + path + '`');
           });
       },
 
@@ -179,7 +179,7 @@ module.exports = {
 
         return aliases.reduce(function(promise, alias) {
           return promise.then(consul.updateAlias.bind(consul, revisionKey, alias));
-        }, Promise.resolve());
+        }, RSVP.resolve());
       },
 
       _uploadMetadata: function(consul, revisionKey, metadata) {
@@ -203,7 +203,7 @@ module.exports = {
         return consul.recentRevisionKeys()
           .then(function(revisionKeys) {
             if (!revisionKeys.length || revisionKeys.length <= maxRevisions) {
-              return Promise.resolve();
+              return RSVP.resolve();
             }
 
             return consul.getActiveRevision()
@@ -225,7 +225,7 @@ module.exports = {
           return obj;
         }, { toRemove: [], toKeep: [] });
 
-        return Promise.resolve(obj);
+        return RSVP.resolve(obj);
       },
 
       _cleanUpKeys: function(consul, obj) {
@@ -234,7 +234,7 @@ module.exports = {
 
         return consul.setRecentRevisions(toKeep)
           .then(function() {
-              return Promise.all(toRemove.map(function(revisionKey) {
+              return RSVP.all(toRemove.map(function(revisionKey) {
                 return consul.deleteRevision(revisionKey);
               }, []));
           });
@@ -243,18 +243,18 @@ module.exports = {
       _uploadSuccess: function(revisionKey) {
         var namespace = this.readConfig('namespaceToken');
         this.log('Uploaded with key `' + revisionKey + '` into namespace `' + namespace + '`', { verbose: true });
-        return Promise.resolve();
+        return RSVP.resolve();
       },
 
       _validateRevisionKey: function(revisionKey, recentRevisions) {
         if (!revisionKey) {
-          return Promise.reject('Revision key to activate must be provided');
+          return RSVP.reject('Revision key to activate must be provided');
         }
 
         if (recentRevisions.indexOf(revisionKey) > -1) {
-          return Promise.resolve();
+          return RSVP.resolve();
         } else {
-          return Promise.reject('Unknown revision key');
+          return RSVP.reject('Unknown revision key');
         }
       },
 
@@ -265,7 +265,7 @@ module.exports = {
       _activationSuccess: function(namespace, revisionKey) {
         this.log('✔ Activated revision `' + revisionKey + '` in namespace `' + namespace + '`', { verbose: true });
 
-        return Promise.resolve();
+        return RSVP.resolve();
       }
     });
 
