@@ -1,6 +1,6 @@
 {
   "name": "ember-cli-deploy-consul-kv-index",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "An EmberCLI Deploy plugin to manage the index.html using Hashicorp's Consul as the key/value store",
   "directories": {
     "doc": "doc",
