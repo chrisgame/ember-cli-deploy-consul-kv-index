@@ -1,6 +1,6 @@
 /* jshint node: true */
 
-var Promise = require('ember-cli/lib/ext/promise');
+var Promise = require('rsvp').Promise;
 
 var consulClient = {
   store: {},
